@@ -1,0 +1,57 @@
+services:
+  sample-celery-redis:
+    image: redis:8.4-alpine
+    container_name: sample-celery-redis
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+      - sample-celery-redis-data:/data
+
+  sample-celery-worker:
+    build: ./worker
+    container_name: sample-celery-worker
+    command: celery -A add_delay.celery_app.celery_app worker --loglevel=info
+    volumes:
+      - ../examples:/app
+    depends_on:
+      - sample-celery-redis
+
+  sample-celery-terminal:
+    build: ./terminal
+    container_name: sample-celery-terminal
+    volumes:
+      - ../examples:/app
+    depends_on:
+      - sample-celery-redis
+    environment:
+      REDIS_HOST: sample-celery-redis
+      REDIS_PORT: 6379
+
+  sample-celery-redisinsight:
+    image: redis/redisinsight:2.70
+    container_name: sample-celery-redisinsight
+    restart: unless-stopped
+    ports:
+      - "8001:5540"
+    depends_on:
+      - sample-celery-redis
+    volumes:
+      - sample-celery-redisinsight-db:/db
+    environment:
+      - RI_STDOUT_LOGGER=true
+
+  sample-celery-flower:
+    image: mher/flower:2.0.1
+    container_name: sample-celery-flower
+    command: celery --broker=redis://sample-celery-redis:6379/0 flower
+    ports:
+      - "8002:5555"
+    depends_on:
+      - sample-celery-redis
+
+volumes:
+  sample-celery-redis-data:
+  sample-celery-redisinsight-db:
